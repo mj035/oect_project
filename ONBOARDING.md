@@ -17,8 +17,8 @@
 ## 프로젝트 위치
 
 - 코드: `C:\Users\dhals\oect-paper-search\`
-- 발표 PPTX (중간): `oect-paper-search\oect_midterm.pptx` (15장 / 10분)
-- PPTX 빌더: `_build_pptx.py` (python-pptx) — 수정 후 `python _build_pptx.py` 재실행
+- GitHub: https://github.com/mj035/oect_project
+- 발표 PPT는 별도로 카톡방에서 공유됨 (repo에는 미포함)
 
 ---
 
@@ -178,9 +178,7 @@ oect-paper-search/
 ├── INTEGRATION_CONTRACT.md ← 팀원 schemdraw 모듈 통합 계약서
 ├── README.md               ← 실행/사용법
 ├── requirements.txt
-├── oect_midterm.pptx       ← 중간 발표 PPT (15장, 10분)
-├── _build_pptx.py          ← python-pptx 기반 PPT 빌더
-└── .env                    ← GEMINI_API_KEY (gitignored)
+└── .env                    ← GEMINI_API_KEY (gitignored, 직접 생성)
 ```
 
 ---
