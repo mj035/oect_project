@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- 간 본체 (우엽) -->
+  <path d="M56 22c0-8-6-14-16-14-4 0-7 1-10 3-3-2-6-3-10-3C10 8 6 16 6 24c0 10 6 18 14 24 4 3 8 5 12 6 4-1 8-3 12-6C52 42 56 32 56 22z"
+        fill="#e8735a" stroke="#d4614a" stroke-width="1"/>
+  <!-- 우엽 하이라이트 -->
+  <path d="M50 20c0-6-4-10-12-10-3 0-6 1-8 2 4 3 8 8 8 16 0 8-4 16-10 22 3 2 6 3 8 4 6-4 14-14 14-24z"
+        fill="#f0937e" opacity="0.5"/>
+  <!-- 중앙 인대 (간낫인대) -->
+  <path d="M30 11c0 0 1 10 1 20s-1 18-1 18"
+        fill="none" stroke="#d4614a" stroke-width="1.5" opacity="0.6"/>
+  <!-- 좌엽 하이라이트 -->
+  <path d="M14 22c0-5 3-9 8-10-2 2-4 5-4 10 0 8 4 16 10 22-3-2-6-5-8-8C16 32 14 28 14 22z"
+        fill="#f5a898" opacity="0.4"/>
+  <!-- 담낭 -->
+  <ellipse cx="22" cy="46" rx="4" ry="5" fill="#7ecba1" stroke="#5eb88a" stroke-width="0.8"/>
+  <ellipse cx="21.5" cy="45" rx="1.5" ry="2" fill="#a8e4c0" opacity="0.6"/>
+</svg>

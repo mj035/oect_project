@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ organ_label }} — OECT 논문 검색</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <style>
+    body { display: flex; flex-direction: column; }
+
+    .layout { display: flex; flex: 1; overflow: hidden; }
+
+    /* ── 왼쪽 패널 ── */
+    .panel {
+      width: 280px; min-width: 280px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 24px 20px;
+      overflow-y: auto;
+      display: flex; flex-direction: column; gap: 24px;
+    }
+    .organ-badge {
+      display: flex; align-items: center; gap: 12px;
+      padding: 16px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+    .organ-badge .icon { font-size: 2rem; }
+    .organ-badge .info { font-size: 1rem; font-weight: 700; }
+    .organ-badge .sub  { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
+
+    .panel-section h3 {
+      font-size: 0.72rem; font-weight: 600;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 12px;
+    }
+    .btn-group { display: flex; flex-direction: column; gap: 8px; }
+    .sel-btn {
+      width: 100%; padding: 10px 14px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--radius); color: var(--text);
+      font-size: 0.88rem; cursor: pointer; text-align: left;
+      transition: all 0.2s;
+    }
+    .sel-btn:hover { border-color: var(--accent); background: rgba(79,142,247,0.08); }
+    .sel-btn.active {
+      border-color: var(--accent); background: rgba(79,142,247,0.15);
+      color: var(--accent); font-weight: 600;
+    }
+
+    .back-link {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 0.82rem; color: var(--muted);
+      text-decoration: none; transition: color 0.2s;
+    }
+    .back-link:hover { color: var(--accent); }
+
+    .api-info {
+      font-size: 0.75rem; color: var(--muted); line-height: 1.6;
+    }
+    .api-info strong { color: var(--text); }
+    .api-info code { color: var(--accent); }
+
+    /* ── 오른쪽 메인 ── */
+    .main { flex: 1; padding: 28px 32px; overflow-y: auto; }
+
+    .main-header { margin-bottom: 24px; }
+    .main-header h2 { font-size: 1.1rem; font-weight: 700; }
+    .keyword-tag {
+      display: inline-block; margin-top: 8px; padding: 4px 12px;
+      background: rgba(79,142,247,0.12); border: 1px solid rgba(79,142,247,0.3);
+      border-radius: 20px; font-size: 0.78rem; color: var(--accent);
+    }
+
+    /* ── 로딩 ── */
+    .loading {
+      display: none; flex-direction: column; align-items: center;
+      justify-content: center; padding: 80px 0; gap: 20px; color: var(--muted);
+    }
+    .loading.show { display: flex; }
+    .loading-text { font-size: 0.9rem; text-align: center; }
+
+    /* ── 빈 상태 ── */
+    .empty {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; padding: 80px 0; gap: 12px; color: var(--muted);
+    }
+    .empty-icon { font-size: 48px; opacity: 0.4; }
+    .empty p { font-size: 0.9rem; }
+
+    /* ── 논문 카드 ── */
+    .cards { display: flex; flex-direction: column; gap: 20px; }
+
+    .card-header { padding: 20px 22px 16px; }
+    .card-meta {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 10px; flex-wrap: wrap;
+    }
+    .card-title { font-size: 0.97rem; font-weight: 600; line-height: 1.5; margin-bottom: 6px; }
+    .card-authors { font-size: 0.8rem; color: var(--muted); }
+    .card-abstract {
+      font-size: 0.82rem; color: var(--muted); line-height: 1.6;
+      margin-top: 10px;
+      max-height: 100px; overflow: hidden;
+      position: relative;
+    }
+    .card-abstract::after {
+      content: '';
+      position: absolute; bottom: 0; left: 0; right: 0;
+      height: 30px;
+      background: linear-gradient(transparent, var(--surface));
+    }
+
+    .card-links { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; align-items: center; }
+    .card-link {
+      padding: 5px 12px; border-radius: 6px;
+      font-size: 0.78rem; font-weight: 500;
+      text-decoration: none; transition: opacity 0.2s;
+    }
+    .card-link:hover { opacity: 0.8; }
+    .link-doi { background: rgba(79,142,247,0.15); color: var(--accent); border: 1px solid rgba(79,142,247,0.3); }
+    .link-pdf { background: rgba(62,207,142,0.15); color: var(--green); border: 1px solid rgba(62,207,142,0.3); }
+
+    /* ── 분석 버튼 ── */
+    .analyze-btn {
+      padding: 8px 18px; border-radius: 8px;
+      background: linear-gradient(135deg, var(--orange), var(--red));
+      border: none; color: #fff;
+      font-size: 0.82rem; font-weight: 600;
+      cursor: pointer; transition: opacity 0.2s, transform 0.1s;
+    }
+    .analyze-btn:hover { opacity: 0.9; }
+    .analyze-btn:active { transform: scale(0.97); }
+    .analyze-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .analyze-btn.done { background: var(--green); cursor: default; }
+
+    /* ── 분석 결과 ── */
+    .analysis-area { border-top: 1px solid var(--border); }
+    .analysis-loading {
+      display: flex; align-items: center; gap: 12px;
+      padding: 20px 22px; color: var(--muted); font-size: 0.85rem;
+    }
+    .materials-list { display: flex; flex-wrap: wrap; gap: 8px; }
+    .circuit-text { font-size: 0.88rem; line-height: 1.7; color: var(--text); }
+    .process-list { display: flex; flex-direction: column; gap: 8px; }
+    /* 재료 8카테고리 그룹 */
+    .mat-groups { display: flex; flex-direction: column; gap: 10px; }
+    .mat-group {
+      display: grid; grid-template-columns: 130px 1fr; gap: 12px;
+      align-items: center; padding: 8px 12px;
+      background: rgba(79,142,247,0.04);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+    .mat-group.empty { opacity: 0.45; }
+    .mat-group-label {
+      font-size: 0.78rem; font-weight: 700; color: var(--accent);
+      letter-spacing: 0.02em;
+    }
+    .mat-group-label .mat-en {
+      display: block; font-size: 0.66rem; font-weight: 500;
+      color: var(--muted); margin-top: 2px; letter-spacing: 0;
+    }
+    .mat-group .materials-list { gap: 6px; }
+    .mat-empty-text { color: var(--muted); font-size: 0.78rem; font-style: italic; }
+    .mat-group.uncat .mat-group-label { color: var(--orange); }
+
+    /* ── 논문 figure 갤러리 ── */
+    .figures-section {
+      padding: 16px 22px;
+      background: rgba(79,142,247,0.04);
+      border-bottom: 1px solid var(--border);
+    }
+    .figures-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .figures-title {
+      font-size: 0.82rem; font-weight: 700; color: var(--text);
+    }
+    .figures-count {
+      font-size: 0.75rem; color: var(--muted);
+    }
+    .figures-cats {
+      display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px;
+    }
+    .fig-cat-btn {
+      padding: 4px 10px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 14px; font-size: 0.72rem;
+      color: var(--muted); cursor: pointer; transition: all 0.2s;
+    }
+    .fig-cat-btn:hover { border-color: var(--accent); color: var(--text); }
+    .fig-cat-btn.active {
+      background: rgba(79,142,247,0.15);
+      border-color: var(--accent); color: var(--accent); font-weight: 600;
+    }
+    .fig-cat-btn.empty { opacity: 0.4; cursor: not-allowed; }
+    .figures-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 10px;
+    }
+    .fig-item {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      cursor: zoom-in;
+      transition: transform 0.15s;
+    }
+    .fig-item:hover { transform: scale(1.03); border-color: var(--accent); }
+    .fig-item img {
+      width: 100%; height: 140px; object-fit: contain;
+      background: #fff; display: block;
+    }
+    .fig-caption {
+      padding: 8px 10px;
+      font-size: 0.72rem; color: var(--muted); line-height: 1.4;
+      border-top: 1px solid var(--border);
+    }
+    .fig-page {
+      font-size: 0.68rem; color: var(--accent); font-weight: 600;
+    }
+    /* ── 출처 뱃지 ── */
+    .fig-meta {
+      display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+      margin-bottom: 4px;
+    }
+    .fig-source-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      border: 1px solid transparent;
+    }
+    .fig-source-badge.raster {
+      color: #34d399; border-color: #34d39955; background: #34d39915;
+    }
+    .fig-source-badge.vector_fallback {
+      color: #60a5fa; border-color: #60a5fa55; background: #60a5fa15;
+    }
+    .fig-source-badge.text_generated {
+      color: #fbbf24; border-color: #fbbf2455; background: #fbbf2415;
+    }
+    .fig-confidence {
+      display: flex; align-items: center; gap: 6px;
+      margin-top: 4px;
+      font-size: 0.66rem; color: var(--muted);
+    }
+    .fig-confidence-bar {
+      flex: 1;
+      height: 4px; border-radius: 2px;
+      background: var(--surface);
+      overflow: hidden;
+    }
+    .fig-confidence-bar > span {
+      display: block; height: 100%;
+      background: linear-gradient(90deg, #f87171, #fbbf24, #34d399);
+    }
+    .fig-loading {
+      padding: 12px 0; font-size: 0.78rem; color: var(--muted);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .fig-empty {
+      padding: 20px; text-align: center;
+      font-size: 0.78rem; color: var(--muted);
+    }
+
+    /* ── 이미지 모달 ── */
+    .fig-modal {
+      display: none;
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.85); z-index: 1000;
+      align-items: center; justify-content: center;
+      padding: 20px;
+    }
+    .fig-modal.show { display: flex; }
+    .fig-modal img {
+      max-width: 90vw; max-height: 85vh;
+      background: #fff; border-radius: 8px;
+    }
+    .fig-modal-close {
+      position: absolute; top: 20px; right: 24px;
+      background: none; border: none; color: #fff;
+      font-size: 2rem; cursor: pointer;
+    }
+
+    /* ── 반응형 ── */
+    @media (max-width: 768px) {
+      .layout { flex-direction: column; }
+      .panel {
+        width: 100%; min-width: 0;
+        border-right: none; border-bottom: 1px solid var(--border);
+        padding: 16px;
+      }
+      .main { padding: 20px 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🔬</div>
+  <div>
+    <h1>OECT 논문 검색 시스템</h1>
+    <div class="subtitle">{% if organ == 'liver' %}<img src="{{ url_for('static', filename='img/liver.svg') }}" alt="간" style="width:1.2em;height:1.2em;vertical-align:middle;">{% else %}{{ organ_icon }}{% endif %} {{ organ_label }} — 논문 검색 & AI 분석</div>
+  </div>
+  <div class="nav-links">
+    <a class="nav-link" href="/">모션 인식</a>
+    <a class="nav-link active" href="/organ/{{ organ }}">{{ organ_label }}</a>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="panel">
+    <a class="back-link" href="/">← 모션 인식으로 돌아가기</a>
+
+    <div class="organ-badge">
+      <div class="icon">{% if organ == 'liver' %}<img src="{{ url_for('static', filename='img/liver.svg') }}" alt="간" style="width:2em;height:2em;">{% else %}{{ organ_icon }}{% endif %}</div>
+      <div>
+        <div class="info">{{ organ_label }}</div>
+        <div class="sub">선택된 타겟 장기</div>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <h3>행동 타입 선택</h3>
+      <div class="btn-group" id="action-group">
+        {% for key, label in actions.items() %}
+        <button class="sel-btn" data-action="{{ key }}" onclick="selectAction(this, '{{ key }}')">{{ label }}</button>
+        {% endfor %}
+      </div>
+    </div>
+
+    <button class="btn-primary" id="search-btn" disabled onclick="startSearch()">
+      논문 검색
+    </button>
+
+    <div class="api-info">
+      <strong>모션팀 연동</strong><br>
+      POST /api/trigger<br>
+      <code>{"organ":"{{ organ }}","action":"sensing"}</code>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div id="error-box" class="error-box"></div>
+
+    <div class="loading" id="loading">
+      <div class="spinner"></div>
+      <div class="loading-text" id="loading-text">논문 찾는 중...</div>
+    </div>
+
+    <div class="empty" id="empty-state">
+      <div class="empty-icon">{% if organ == 'liver' %}<img src="{{ url_for('static', filename='img/liver.svg') }}" alt="간" style="width:48px;height:48px;">{% else %}{{ organ_icon }}{% endif %}</div>
+      <p>행동 타입을 선택하고 검색하세요</p>
+    </div>
+
+    <div id="results" style="display:none;">
+      <div class="main-header">
+        <h2 id="result-title"></h2>
+        <span class="keyword-tag" id="keyword-tag"></span>
+        <p style="font-size:0.82rem; color:var(--muted); margin-top:8px;">
+          논문을 선택하면 AI가 전체 PDF를 분석합니다
+        </p>
+      </div>
+      <div class="cards" id="cards-container"></div>
+    </div>
+  </main>
+</div>
+
+<script>
+  const ORGAN = "{{ organ }}";
+  let selectedAction = null;
+  let searchPapers = [];
+
+  function selectAction(btn, action) {
+    document.querySelectorAll('.sel-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedAction = action;
+    document.getElementById('search-btn').disabled = false;
+  }
+
+  // ── 논문 검색 ──
+  async function startSearch() {
+    if (!selectedAction) return;
+    showLoading(true, '논문 찾는 중...');
+    hideError();
+    document.getElementById('results').style.display = 'none';
+    document.getElementById('empty-state').style.display = 'none';
+
+    try {
+      const resp = await fetch('/api/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ organ: ORGAN, action: selectedAction }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        showError(data.error || '알 수 없는 오류가 발생했습니다.');
+        return;
+      }
+      renderResults(data);
+    } catch (err) {
+      showError('서버에 연결할 수 없습니다. Flask 서버가 실행 중인지 확인하세요.');
+    } finally {
+      showLoading(false);
+    }
+  }
+
+  // ── 결과 렌더링 ──
+  function renderResults(data) {
+    searchPapers = data.papers;
+
+    document.getElementById('result-title').textContent =
+      `${data.organLabel} + ${data.actionLabel} — ${data.papers.length}편 검색됨`;
+    document.getElementById('keyword-tag').textContent = `${data.keyword}`;
+
+    const container = document.getElementById('cards-container');
+    container.innerHTML = '';
+
+    data.papers.forEach((paper, i) => {
+      const card = createCard(paper, i);
+      container.appendChild(card);
+      setTimeout(() => card.classList.add('visible'), 80 * i);
+    });
+
+    document.getElementById('results').style.display = 'block';
+  }
+
+  function createCard(paper, idx) {
+    const card = document.createElement('div');
+    card.className = 'card';
+    const uid = `card-${idx}`;
+
+    const pdfLink = paper.pdfUrl
+      ? `<a class="card-link link-pdf" href="${paper.pdfUrl}" target="_blank">PDF</a>` : '';
+
+    const pdfBadge = paper.pdfUrl
+      ? '<span class="badge badge-pdf">PDF 있음</span>'
+      : '<span class="badge badge-nopdf">PDF 없음</span>';
+
+    const analyzeLabel = paper.pdfUrl ? 'AI PDF 분석' : 'AI 초록 분석';
+
+    card.innerHTML = `
+      <div class="card-header">
+        <div class="card-meta">
+          ${paper.year ? `<span class="badge badge-year">${paper.year}</span>` : ''}
+          <span class="badge badge-cite">인용 ${paper.citationCount}</span>
+          ${pdfBadge}
+        </div>
+        <div class="card-title">${esc(paper.title)}</div>
+        <div class="card-authors">${esc(paper.authors)}</div>
+        <div class="card-abstract">${esc(paper.abstractShort)}</div>
+        <div class="card-links">
+          <a class="card-link link-doi" href="${paper.url}" target="_blank">논문 링크</a>
+          ${pdfLink}
+          <button class="analyze-btn" id="${uid}-btn" onclick="analyzeCard(${idx}, '${uid}')">${analyzeLabel}</button>
+        </div>
+      </div>
+      <div class="analysis-area" id="${uid}-analysis" style="display:none;"></div>
+    `;
+    return card;
+  }
+
+  // ── 개별 논문 AI 분석 ──
+  async function analyzeCard(idx, uid) {
+    const paper = searchPapers[idx];
+    if (!paper) return;
+
+    const btn = document.getElementById(`${uid}-btn`);
+    btn.disabled = true;
+    btn.textContent = '분석 중...';
+
+    const area = document.getElementById(`${uid}-analysis`);
+    area.style.display = 'block';
+    area.innerHTML = `
+      <div class="analysis-loading">
+        <div class="mini-spinner"></div>
+        <span>${paper.pdfUrl ? 'PDF 다운로드 & AI 분석 중... (30초~1분 소요)' : '초록 AI 분석 중...'}</span>
+      </div>
+    `;
+
+    try {
+      const resp = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: paper.title,
+          abstract: paper.fullAbstract,
+          pdfUrl: paper.pdfUrl || null,
+        }),
+      });
+      const data = await resp.json();
+
+      if (!resp.ok) {
+        area.innerHTML = `<div style="padding:16px 22px; color:#f87171; font-size:0.85rem;">${esc(data.error)}</div>`;
+        btn.textContent = '재시도';
+        btn.disabled = false;
+        return;
+      }
+
+      // PDF 차단되어 초록 fallback인 경우 → 업로드 옵션 표시
+      if (data.pdfFailed) {
+        renderAnalysisWithUpload(uid, idx, data);
+      } else {
+        renderAnalysis(uid, data);
+        // PDF 분석 성공 시 이미지도 추출 (회로 폴백 신뢰도 향상을 위해 summary 동봉)
+        if (data.source === 'pdf' && paper.pdfUrl) {
+          loadFigures(uid, idx, 'url', paper.pdfUrl, data.summary);
+        }
+      }
+      btn.textContent = data.source === 'pdf' ? '분석 완료' : '초록 분석됨';
+      btn.classList.add('done');
+    } catch (err) {
+      area.innerHTML = `<div style="padding:16px 22px; color:#f87171; font-size:0.85rem;">서버 연결 오류</div>`;
+      btn.textContent = '재시도';
+      btn.disabled = false;
+    }
+  }
+
+  // ── PDF 차단 시: 초록 결과 + 업로드 옵션 ──
+  function renderAnalysisWithUpload(uid, idx, data) {
+    const paper = searchPapers[idx];
+    renderAnalysis(uid, data);
+    // 분석 영역 상단에 업로드 안내 추가
+    const area = document.getElementById(`${uid}-analysis`);
+    const uploadHtml = `
+      <div style="padding:14px 22px; background:rgba(245,158,11,0.08); border-bottom:1px solid var(--border);">
+        <div style="font-size:0.85rem; color:var(--orange); font-weight:600; margin-bottom:8px;">
+          출판사가 PDF 자동 다운로드를 차단했습니다
+        </div>
+        <div style="font-size:0.8rem; color:var(--muted); margin-bottom:10px;">
+          PDF를 직접 다운로드한 후 업로드하면 전문 분석이 가능합니다
+        </div>
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+          ${paper.pdfUrl ? `<a href="${paper.pdfUrl}" target="_blank" style="padding:6px 14px; background:rgba(62,207,142,0.15); color:var(--green); border:1px solid rgba(62,207,142,0.3); border-radius:6px; font-size:0.8rem; text-decoration:none;">PDF 열기 (브라우저)</a>` : ''}
+          <label style="padding:6px 14px; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border-radius:6px; font-size:0.8rem; font-weight:600; cursor:pointer;">
+            PDF 업로드 분석
+            <input type="file" accept=".pdf" style="display:none;" onchange="uploadPdf(this, '${uid}')">
+          </label>
+        </div>
+      </div>
+    `;
+    area.insertAdjacentHTML('afterbegin', uploadHtml);
+  }
+
+  // ── PDF 업로드 → 서버 분석 ──
+  async function uploadPdf(input, uid) {
+    const file = input.files[0];
+    if (!file) return;
+
+    const area = document.getElementById(`${uid}-analysis`);
+    area.innerHTML = `
+      <div class="analysis-loading">
+        <div class="mini-spinner"></div>
+        <span>업로드된 PDF 분석 중... (30초~1분 소요)</span>
+      </div>
+    `;
+
+    const formData = new FormData();
+    formData.append('pdf', file);
+
+    try {
+      const resp = await fetch('/api/analyze-upload', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await resp.json();
+
+      if (!resp.ok) {
+        area.innerHTML = `<div style="padding:16px 22px; color:#f87171; font-size:0.85rem;">${esc(data.error)}</div>`;
+        return;
+      }
+
+      renderAnalysis(uid, data);
+      // 업로드 PDF에서 이미지도 추출 (summary 동봉 — 회로 폴백 신뢰도 향상)
+      loadFigures(uid, null, 'upload', file, data.summary);
+    } catch (err) {
+      area.innerHTML = `<div style="padding:16px 22px; color:#f87171; font-size:0.85rem;">업로드 분석 오류</div>`;
+    }
+  }
+
+  const TAB_DEFS = [
+    { key: 'materials',        label: '재료',        type: 'materials' },
+    { key: 'device_structure', label: '디바이스 구조', type: 'text',  figCat: 'device_schematic' },
+    { key: 'mechanism',        label: '동작 원리',    type: 'text',  figCat: 'mechanism' },
+    { key: 'process',          label: '공정',        type: 'array'  },
+    { key: 'application',      label: '응용/타겟',    type: 'text'   },
+    { key: 'circuit',          label: '회로',        type: 'fig_only', figCat: 'circuit' },
+  ];
+
+  // 재료 8카테고리 — 표시 순서 + 한/영 라벨
+  const MATERIAL_CATEGORIES = [
+    { key: 'substrate',     ko: '기판',        en: 'Substrate' },
+    { key: 'source',        ko: '소스 전극',    en: 'Source' },
+    { key: 'drain',         ko: '드레인 전극',  en: 'Drain' },
+    { key: 'channel',       ko: '채널',        en: 'Channel (semiconductor)' },
+    { key: 'gate',          ko: '게이트 전극',  en: 'Gate' },
+    { key: 'electrolyte',   ko: '전해질',      en: 'Electrolyte' },
+    { key: 'interconnect',  ko: '배선',        en: 'Interconnect' },
+    { key: 'encapsulation', ko: '봉지층',      en: 'Encapsulation' },
+  ];
+
+  function renderMaterialsBlock(mats) {
+    // mats: object with 8 keys → arrays. Back-compat: array.
+    if (Array.isArray(mats)) {
+      // 구 응답 (캐시) — 단일 그룹으로 표시
+      if (!mats.length) return '<div class="mat-empty-text">정보 없음</div>';
+      return `<div class="materials-list">${mats.map(m => `<span class="material-chip">${esc(m)}</span>`).join('')}</div>`;
+    }
+    if (!mats || typeof mats !== 'object') {
+      return '<div class="mat-empty-text">정보 없음</div>';
+    }
+    const rows = MATERIAL_CATEGORIES.map(cat => {
+      const arr = Array.isArray(mats[cat.key]) ? mats[cat.key] : [];
+      const isEmpty = arr.length === 0;
+      const chips = isEmpty
+        ? '<span class="mat-empty-text">언급 없음</span>'
+        : `<div class="materials-list">${arr.map(m => `<span class="material-chip">${esc(m)}</span>`).join('')}</div>`;
+      return `<div class="mat-group${isEmpty ? ' empty' : ''}">
+        <div class="mat-group-label">${cat.ko}<span class="mat-en">${cat.en}</span></div>
+        <div>${chips}</div>
+      </div>`;
+    }).join('');
+    let uncatRow = '';
+    const uncat = Array.isArray(mats._uncategorized) ? mats._uncategorized : [];
+    if (uncat.length) {
+      uncatRow = `<div class="mat-group uncat">
+        <div class="mat-group-label">미분류<span class="mat-en">Uncategorized</span></div>
+        <div><div class="materials-list">${uncat.map(m => `<span class="material-chip">${esc(m)}</span>`).join('')}</div></div>
+      </div>`;
+    }
+    return `<div class="mat-groups">${rows}${uncatRow}</div>`;
+  }
+
+  function renderAnalysis(uid, data) {
+    const s = data.summary || {};
+    let sourceTag;
+    if (data.source === 'pdf') {
+      sourceTag = '<span class="source-tag source-pdf">PDF 전문 분석 (논문 전체 분석 완료)</span>';
+    } else if (data.pdfFailed) {
+      sourceTag = `<span class="source-tag source-abstract">초록 기반 분석</span>
+        <div style="font-size:0.78rem;color:#f59e0b;margin:6px 0 8px;">출판사가 PDF 자동 다운로드를 차단하여 초록으로 대체 분석했습니다</div>`;
+    } else {
+      sourceTag = '<span class="source-tag source-abstract">초록 기반 분석</span>';
+    }
+
+    // 탭 버튼
+    const tabButtonsHtml = TAB_DEFS.map((t, i) =>
+      `<button class="tab-btn ${i === 0 ? 'active' : ''}" onclick="switchTab('${uid}','${t.key}',this)">${t.label}</button>`
+    ).join('');
+
+    // 탭 내용
+    const tabContentsHtml = TAB_DEFS.map((t, i) => {
+      const activeCls = i === 0 ? 'active' : '';
+      let body = '';
+
+      if (t.type === 'fig_only') {
+        const initMsg = data.source === 'pdf'
+          ? '<div class="fig-loading"><div class="mini-spinner"></div><span>논문 이미지 추출 대기 중...</span></div>'
+          : '<div class="fig-empty">PDF 분석 시 논문의 실제 회로 이미지가 여기에 표시됩니다<br>(현재 초록 기반 분석 — PDF 업로드 시 활성화)</div>';
+        body = `<div id="${uid}-figs-${t.figCat}" class="figures-grid">${initMsg}</div>`;
+      } else if (t.type === 'materials') {
+        body = renderMaterialsBlock(s[t.key]);
+      } else if (t.type === 'array') {
+        const arr = Array.isArray(s[t.key]) ? s[t.key] : [String(s[t.key] || '')];
+        body = `<div class="process-list">${arr.map((step, idx) =>
+          `<div class="process-step"><div class="step-num">${idx + 1}</div><div class="step-text">${esc(step)}</div></div>`
+        ).join('')}</div>`;
+      } else {
+        // text type
+        body = `<div class="circuit-text">${esc(s[t.key] || '정보 없음')}</div>`;
+        // device_structure, mechanism에는 관련 figure 그리드도 표시
+        if (t.figCat) {
+          body += `<div id="${uid}-figs-${t.figCat}" class="figures-grid" style="margin-top:14px;"></div>`;
+        }
+      }
+
+      return `<div id="${uid}-${t.key}" class="tab-content ${activeCls}">${sourceTag}${body}</div>`;
+    }).join('');
+
+    const area = document.getElementById(`${uid}-analysis`);
+    area.innerHTML = `
+      <div class="tab-nav">${tabButtonsHtml}</div>
+      ${tabContentsHtml}
+    `;
+  }
+
+  function switchTab(uid, tabName, clickedBtn) {
+    clickedBtn.closest('.tab-nav').querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    clickedBtn.classList.add('active');
+    TAB_DEFS.forEach(t => {
+      const el = document.getElementById(`${uid}-${t.key}`);
+      if (el) el.classList.toggle('active', t.key === tabName);
+    });
+  }
+
+  // ── 논문 이미지 추출 + 카테고리별 주입 ──
+  async function loadFigures(uid, paperIdx, source, fileOrUrl, summary) {
+    // source: 'url' or 'upload'
+    // summary: 직전 분석 결과 (회로 폴백 신뢰도 향상용, 옵셔널)
+    const setAllFigsLoading = (msg) => {
+      TAB_DEFS.forEach(t => {
+        if (!t.figCat) return;
+        const el = document.getElementById(`${uid}-figs-${t.figCat}`);
+        if (el) el.innerHTML = `<div class="fig-loading"><div class="mini-spinner"></div><span>${esc(msg)}</span></div>`;
+      });
+    };
+    const setFigsError = (msg) => {
+      TAB_DEFS.forEach(t => {
+        if (!t.figCat) return;
+        const el = document.getElementById(`${uid}-figs-${t.figCat}`);
+        if (el) el.innerHTML = `<div class="fig-empty">${esc(msg)}</div>`;
+      });
+    };
+
+    setAllFigsLoading('논문에서 이미지 추출 & 분류 중...');
+
+    try {
+      let resp;
+      if (source === 'upload') {
+        const fd = new FormData();
+        fd.append('pdf', fileOrUrl);
+        if (summary) fd.append('summary', JSON.stringify(summary));
+        resp = await fetch('/api/extract-figures-upload', { method: 'POST', body: fd });
+      } else {
+        resp = await fetch('/api/extract-figures', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pdfUrl: fileOrUrl, summary: summary || null }),
+        });
+      }
+      const data = await resp.json();
+      if (!resp.ok) {
+        setFigsError(data.pdfBlocked ? 'PDF 접근 차단 — 이미지 추출 불가' : (data.error || '이미지 추출 실패'));
+        return;
+      }
+      renderFigures(uid, data.figures || {});
+    } catch (err) {
+      setFigsError('네트워크 오류');
+    }
+  }
+
+  const SOURCE_BADGES = {
+    raster:           { cls: 'raster',           label: '논문 원본' },
+    vector_fallback:  { cls: 'vector_fallback',  label: '벡터 추출' },
+    text_generated:   { cls: 'text_generated',   label: 'AI 생성' },
+  };
+
+  function _figBadgeHtml(f) {
+    const src = f.source || 'raster';
+    const meta = SOURCE_BADGES[src] || SOURCE_BADGES.raster;
+    const pageStr = (f.page && f.page > 0) ? `p.${f.page}` : '';
+    return `
+      <div class="fig-meta">
+        <span class="fig-source-badge ${meta.cls}">${meta.label}</span>
+        ${pageStr ? `<span class="fig-page">${pageStr}</span>` : ''}
+      </div>
+    `;
+  }
+
+  function _figConfidenceHtml(f) {
+    if (f.source !== 'text_generated') return '';
+    // 캡션에 "신뢰도 0.xx" 형식으로 박혀 있음 → 추출
+    const m = (f.caption || '').match(/신뢰도\s*([0-9]\.[0-9]+)/);
+    if (!m) return '';
+    const conf = Math.max(0, Math.min(1, parseFloat(m[1])));
+    const pct = Math.round(conf * 100);
+    return `
+      <div class="fig-confidence">
+        <span>신뢰도 ${pct}%</span>
+        <div class="fig-confidence-bar"><span style="width:${pct}%"></span></div>
+      </div>
+    `;
+  }
+
+  function renderFigures(uid, grouped) {
+    TAB_DEFS.forEach(t => {
+      if (!t.figCat) return;
+      const el = document.getElementById(`${uid}-figs-${t.figCat}`);
+      if (!el) return;
+      const list = grouped[t.figCat] || [];
+      if (list.length === 0) {
+        el.innerHTML = `<div class="fig-empty">이 카테고리의 이미지가 논문에서 발견되지 않았습니다</div>`;
+        return;
+      }
+      el.innerHTML = list.map(f => `
+        <div class="fig-item" onclick="openFigModal('data:image/png;base64,${f.image_b64}')">
+          <img src="data:image/png;base64,${f.image_b64}" alt="figure">
+          <div class="fig-caption">
+            ${_figBadgeHtml(f)}
+            ${esc(f.caption || '')}
+            ${_figConfidenceHtml(f)}
+          </div>
+        </div>
+      `).join('');
+    });
+  }
+
+  // ── 이미지 확대 모달 ──
+  function openFigModal(src) {
+    let modal = document.getElementById('fig-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'fig-modal';
+      modal.className = 'fig-modal';
+      modal.innerHTML = `
+        <button class="fig-modal-close" onclick="closeFigModal()">×</button>
+        <img id="fig-modal-img" src="" alt="">
+      `;
+      modal.addEventListener('click', (e) => { if (e.target === modal) closeFigModal(); });
+      document.body.appendChild(modal);
+    }
+    document.getElementById('fig-modal-img').src = src;
+    modal.classList.add('show');
+  }
+  function closeFigModal() {
+    const modal = document.getElementById('fig-modal');
+    if (modal) modal.classList.remove('show');
+  }
+
+  // ── 유틸 ──
+  function esc(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function showLoading(show, text) {
+    document.getElementById('loading').classList.toggle('show', show);
+    if (text) document.getElementById('loading-text').textContent = text;
+  }
+  function showError(msg) {
+    const el = document.getElementById('error-box');
+    el.textContent = msg;
+    el.classList.add('show');
+    document.getElementById('empty-state').style.display = 'none';
+  }
+  function hideError() {
+    document.getElementById('error-box').classList.remove('show');
+  }
+</script>
+
+</body>
+</html>

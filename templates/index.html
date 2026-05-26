@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OECT 모션 인식 시스템</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <style>
+    body { display: flex; flex-direction: column; }
+
+    .hero {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 40px 20px; gap: 24px;
+    }
+
+    .hero-title { font-size: 1.6rem; font-weight: 700; text-align: center; }
+    .hero-sub   { font-size: 0.92rem; color: var(--muted); text-align: center; max-width: 520px; line-height: 1.7; }
+
+    /* ─── 카메라 영역 ─── */
+    .camera-wrap {
+      position: relative;
+      width: 640px; max-width: 90vw;
+      aspect-ratio: 4/3;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 2px solid var(--border);
+      background: #000;
+    }
+    #webcam {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      transform: scaleX(-1);
+    }
+    #pose-canvas {
+      position: absolute; top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+    }
+    .camera-overlay {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      padding: 16px 20px;
+      background: linear-gradient(transparent, rgba(0,0,0,0.8));
+      display: flex; align-items: center; gap: 12px;
+    }
+    .detect-indicator {
+      width: 12px; height: 12px; border-radius: 50%;
+      background: var(--red);
+      transition: background 0.3s;
+    }
+    .detect-indicator.active { background: var(--green); animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(62,207,142,0.4); } 50% { box-shadow: 0 0 0 8px rgba(62,207,142,0); } }
+    .detect-text { font-size: 0.88rem; color: var(--text); }
+    .detect-organ { font-size: 1rem; font-weight: 700; color: var(--green); }
+
+    /* ─── 감지 상태 ─── */
+    .status-bar {
+      display: flex; align-items: center; gap: 16px;
+      padding: 14px 24px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius);
+      min-width: 400px;
+    }
+    .status-icon { font-size: 1.5rem; }
+    .status-msg  { font-size: 0.9rem; color: var(--muted); }
+    .status-msg strong { color: var(--text); }
+
+    /* ─── 매뉴얼 선택 그리드 ─── */
+    .manual-section {
+      text-align: center; margin-top: 12px;
+    }
+    .manual-section h3 {
+      font-size: 0.78rem; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.08em;
+      margin-bottom: 14px;
+    }
+    .organ-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+    .organ-card {
+      display: flex; flex-direction: column;
+      align-items: center; gap: 8px;
+      padding: 18px 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: all 0.25s;
+      text-decoration: none; color: var(--text);
+    }
+    .organ-card:hover {
+      border-color: var(--accent);
+      background: rgba(79,142,247,0.06);
+      transform: translateY(-3px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    }
+    .organ-card .icon { font-size: 2rem; }
+    .organ-card .label { font-size: 0.85rem; font-weight: 600; }
+
+    /* ─── 안내 프롬프트 ─── */
+    .gesture-guide {
+      display: flex; flex-wrap: wrap; justify-content: center;
+      gap: 10px; max-width: 640px;
+    }
+    .gesture-item {
+      padding: 6px 14px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      font-size: 0.78rem; color: var(--muted);
+    }
+    .gesture-item span { color: var(--text); font-weight: 600; }
+
+    .divider {
+      width: 80%; max-width: 500px;
+      height: 1px; background: var(--border);
+      margin: 8px 0;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🔬</div>
+  <div>
+    <h1>OECT 논문 검색 시스템</h1>
+    <div class="subtitle">MediaPipe 모션 인식 + AI 논문 분석</div>
+  </div>
+  <div class="nav-links">
+    <a class="nav-link active" href="/">모션 인식</a>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="hero-title">모션으로 신체 부위를 선택하세요</div>
+  <div class="hero-sub">
+    카메라 앞에서 손을 특정 위치로 가져가면 해당 장기가 자동 인식됩니다.
+    또는 아래 버튼으로 직접 선택할 수 있습니다.
+  </div>
+
+  <!-- 카메라 -->
+  <div class="camera-wrap">
+    <video id="webcam" autoplay playsinline></video>
+    <canvas id="pose-canvas"></canvas>
+    <div class="camera-overlay">
+      <div class="detect-indicator" id="detect-dot"></div>
+      <span class="detect-text" id="detect-text">대기 중...</span>
+    </div>
+  </div>
+
+  <!-- 제스처 가이드 -->
+  <div class="gesture-guide">
+    <div class="gesture-item"><span>🧠</span> 손 → 머리 위 = 뇌</div>
+    <div class="gesture-item"><span>❤️</span> 손 → 가슴 = 심장</div>
+    <div class="gesture-item"><span><img src="{{ url_for('static', filename='img/liver.svg') }}" alt="간" style="width:1.2em;height:1.2em;vertical-align:middle;"></span> 손 → 배 = 간</div>
+    <div class="gesture-item"><span>👁️</span> V사인 + 얼굴 옆 = 눈</div>
+    <div class="gesture-item"><span>💪</span> 양손 주먹 = 근육</div>
+    <div class="gesture-item"><span>🖐️</span> 양손 손바닥 펼침 = 피부</div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- 매뉴얼 선택 -->
+  <div class="manual-section">
+    <h3>또는 직접 선택</h3>
+    <div class="organ-grid">
+      {% for key, label in organs.items() %}
+      <a class="organ-card" href="/organ/{{ key }}">
+        <div class="icon">{% if key == 'liver' %}<img src="{{ url_for('static', filename='img/liver.svg') }}" alt="간" style="width:2em;height:2em;">{% else %}{{ organ_icons[key] }}{% endif %}</div>
+        <div class="label">{{ label }}</div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/mediapipe.js') }}"></script>
+
+</body>
+</html>
