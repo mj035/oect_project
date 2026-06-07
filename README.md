@@ -6,6 +6,17 @@ MediaPipe 모션 인식으로 신체 부위를 선택하면
 
 ---
 
+## 발표자료
+
+| 발표 | PDF (바로 보기) | PPTX (원본) |
+|------|----------------|-------------|
+| 중간 발표 | [중간 발표 PDF](docs/OECT논문분석시스템_중간발표.pdf) | [PPTX](docs/OECT논문분석시스템_중간발표.pptx) |
+| 기말 발표 | [기말 발표 PDF](docs/OECT논문분석시스템_기말발표.pdf) | [PPTX](docs/OECT논문분석시스템_기말발표.pptx) |
+
+> PDF는 GitHub에서 바로 미리보기가 가능하며, PPTX는 다운로드 후 PowerPoint로 열 수 있습니다.
+
+---
+
 ## 실행 방법
 
 ### 1. 패키지 설치
@@ -117,9 +128,10 @@ oect-paper-search/
 ├── templates/
 │   ├── index.html          ← MediaPipe 모션 인식 페이지
 │   └── organ.html          ← 논문 검색 & AI 분석 페이지
-└── static/
-    ├── css/
-    │   └── style.css       ← 공통 다크 테마
-    └── js/
-        └── mediapipe.js    ← 모션 인식 로직
+├── static/
+│   ├── css/
+│   │   └── style.css       ← 공통 다크 테마
+│   └── js/
+│       └── mediapipe.js    ← 모션 인식 로직
+└── docs/                   ← 발표자료 (중간/기말, PDF + PPTX)
 ```
